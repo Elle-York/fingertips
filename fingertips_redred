@@ -1,0 +1,26 @@
+# interactively selecting indicators ------------------------
+# highlighting the areas for each indicator that are deteriorating 
+# and are already statistically significantly worse than the England (or parent) value
+
+library(fingertipsR)
+library(ggplot2)
+
+inds <- select_indicators()
+
+df <- fingertips_redred(inds, Comparator = "England")
+
+# Visualise poorly performing areas ------------------------
+
+df$IndicatorName <- sapply(strwrap(df$IndicatorName, 60,
+ simplify = FALSE),
+ paste, collapse= "\n")
+p <- ggplot(df, aes(IndicatorName, AreaName)) +
+ geom_point(colour = "darkred") +
+ theme_minimal() +
+ theme(axis.text.x = element_text(angle = 45,
+ hjust = 1,
+ size = rel(0.85)),
+ axis.text.y = element_text(size = rel(0.9))) +
+ labs(y = "Upper Tier Local Authority",
+ x = "Indicator")
+print(p)
