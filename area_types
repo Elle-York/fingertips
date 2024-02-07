@@ -1,0 +1,42 @@
+
+# Open as a project
+ 
+ 
+# 1. Libraries ----------------------------------------------------------------
+ 
+library(tidyverse)
+library(fingertipsR)
+library(data.table)
+ 
+ 
+# 2. Find Area Codes ----------------------------------------------------------
+ 
+View(area_types(), "at") # Create list of Area IDs
+ 
+# e.g from the list I've picked code 154 (CCG unchanged plus new 2018)
+# I've also picked the matching list of CCGs using code 120
+ 
+# 3. Find Indicators that use these area codes --------------------------------
+ 
+View(indicator_areatypes(),"ind_at")
+ 
+# 3. Output a lookup of CCGs and STPs -----------------------------------------
+ 
+# Pick an indicator ID and use the area codes you found in step two...
+ 
+df <- fingertips_data(IndicatorID = 200,
+                      AreaTypeID = 154,
+                      ParentAreaTypeID = 120) %>%
+  filter(AreaType == "CCGs (since 4/2018)") %>%
+  select(ParentCode:AreaName) %>%
+  unique()
+ 
+# This list could then be saved against the ONS official CCG look-up and checked to make sure it's correct
+# ONS site = http://geoportal.statistics.gov.uk/datasets/7e72ce9cd4204d588c6f8dd1cac77e98_0/data
+# Some of you may be wondering why not go straight to the site? That would be the best way
+# but you might want to check what's been uploaded to see if it's correct etc.
+ 
+# 4. Save output to a CSV file ------------------------------------------------
+ 
+fwrite(df, "CCG_LUP.csv") # As it is a project, it will save direct to the folder area
+
