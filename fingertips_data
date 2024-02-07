@@ -1,0 +1,63 @@
+# 1. Load packages ------------------------------------------------------------
+ 
+library(fingertipsR)
+library(tidyverse)
+library(data.table)
+ 
+# 2. Check STP values ---------------------------------------------------------
+ 
+STP <- fingertips_data(247, AreaTypeID = 120) %>% # filter this indicator, 120 = STPs
+  filter(AreaType == "STP") %>% # filter STPs only (Removes additional England value)
+  filter(Timeperiod == max(Timeperiod)) %>% # latest upload date
+  select(AreaCode, Sex, Age, Value, LowerCI95.0limit, UpperCI95.0limit, Count, Denominator, Valuenote) # Choose columns
+ 
+summary(STP) # QA values
+unique(STP$Valuenote) # Check value notes
+glimpse(STP) # Check the dataframe layout
+ 
+ 
+# 3. Check CCG values ---------------------------------------------------------
+ 
+CCG <- fingertips_data(247, AreaTypeID = 152) %>%
+  filter(str_detect(AreaType, "CCG")) %>%
+  filter(Timeperiod == max(Timeperiod)) %>%
+  select(AreaCode, Sex, Age, Value, LowerCI95.0limit, UpperCI95.0limit, Count, Denominator, Valuenote)
+ 
+summary(CCG)
+unique(CCG$Valuenote)
+glimpse(CCG) # Check the dataframe layout
+ 
+# 4. Check LA values ----------------------------------------------------------
+ 
+LA <- fingertips_data(247, AreaTypeID = 102) %>%
+  filter(AreaType == "County & UA") %>%
+  filter(Timeperiod == max(Timeperiod)) %>%
+  select(AreaCode, Sex, Age, Value, LowerCI95.0limit, UpperCI95.0limit, Count, Denominator, Valuenote)
+ 
+summary(LA)
+unique(LA$Valuenote)
+glimpse(LA) # Check the dataframe layout
+ 
+ 
+# 5. Check Regions ------------------------------------------------------------
+ 
+Region <- fingertips_data(247) %>%
+  filter(AreaType == "Region") %>%
+  filter(Timeperiod == max(Timeperiod)) %>%
+  select(AreaCode, Sex, Age, Value, LowerCI95.0limit, UpperCI95.0limit, Count, Denominator, Valuenote)
+ 
+summary(Region)
+unique(Region$Valuenote)
+glimpse(Region) # Check the dataframe layout
+  
+ 
+# 6. Check England value ------------------------------------------------------
+ 
+England <- fingertips_data(247) %>%
+  filter(AreaCode == 'E92000001') %>%
+  filter(Timeperiod == max(Timeperiod)) %>%
+  select(AreaCode, Sex, Age, Value, LowerCI95.0limit, UpperCI95.0limit, Count, Denominator, Valuenote) # Choose columns
+ 
+summary(England) # QA values
+unique(England$Valuenote) # Check value notes
+glimpse(England) # Check the dataframe layout
