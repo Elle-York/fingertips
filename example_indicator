@@ -1,0 +1,160 @@
+# Indicator 93026 CCG ---------------------------------------------------------
+ 
+# Dementia (aged under 65 years) as a Proportion of Total Dementia
+# (all ages) per 100 (2018)
+ 
+# 1. Packages/Libraries -------------------------------------------------------
+ 
+if(!require("tidyverse")) {install.packages("tidyverse");library(tidyverse)}
+if(!require("data.table")) {install.packages("data.table");library(data.table)}
+if(!require("PHEindicatormethods")) {install.packages("PHEindicatormethods");library(PHEindicatormethods)}
+if(!require("readxl")) {install.packages("readxl");library(readxl)}
+if(!require("xlsx")) {install.packages("xlsx");library(xlsx)}
+if(!require("lubridate")) {install.packages("lubridate");library(lubridate)}
+ 
+# 2. Import Data --------------------------------------------------------------
+ 
+df <- fread("The_file_name.csv") # when working in projects, you can just use the truncated path
+ 
+ 
+glimpse(df) # Look at the dataset
+ 
+ 
+# Plot the data. Check for anomalies and outliers. This will only plot the numeric columns.
+ 
+ 
+df %>% keep(is.numeric) %>%
+  gather() %>%
+  ggplot(aes(value)) +
+  facet_wrap(~ key, scales = "free") +
+  geom_histogram()
+ 
+# 3. Reshape the data ---------------------------------------------------------
+ 
+df <- df %>% filter(Measure == "DEMENTIA_REGISTER_65_PLUS"|
+                      Measure == "PAT_LIST_65_PLUS" |
+                      Measure == "DEMENTIA_REGISTER_0_64"|
+                      Measure == "PAT_LIST_0_64") %>%
+  spread(Measure, Value) # Takes one column and splits it into the four cols above
+ 
+# 4. Adjust date column and re-order by practice code -----------------------------
+ 
+df <- df %>%
+  mutate(ACH_DATE = dmy(ACH_DATE)) %>%
+  filter(ACH_DATE == max(ACH_DATE)) %>%
+  arrange(PRACTICE_CODE)
+ 
+unique(df$ACH_DATE) # Check we have only one date in this column = 31 March, 2018
+ 
+# 5. NA Values ----------------------------------------------------------------
+ 
+na_data <- df %>% filter_all(any_vars(is.na(.))) # Save & check snapshot of NA values
+ 
+df <- na.omit(df) #  7132 pracs - 4 pracs = 7128 - Get rid of the NA values
+ 
+ 
+# 6. Join LookUp to data ------------------------------------------------------
+ 
+LUP <- fread("CCG_Lookup.csv") # CCG data from ONS website for April 18
+glimpse(df)
+glimpse(LUP)
+length(unique(df$GEOGRAPHY_CODE)) # 195 CCGs
+ 
+df <- left_join(df, LUP, by = c("GEOGRAPHY_CODE" = "CCG_Code")) # Join CCG and Dementia data
+ 
+# 7. Select columns and rename where appropriate -----------------------------
+ 
+glimpse(df)
+df <- df %>%
+  select(CCG_Code = GEOGRAPHY_CODE,
+         CCG_Name,
+         STP_Code,
+         STP_Name,
+         England_Code,
+         England_Name,
+         Dem64 = DEMENTIA_REGISTER_0_64,
+         Pat64 = PAT_LIST_0_64)
+ 
+ 
+# 8. Aggregate + Bind Data -------------------------------------------------------
+ 
+CCG_df <- df %>% # Aggregate CCGs
+  group_by(CCG_Code, CCG_Name) %>%
+  summarise(Dem64 = sum(Dem64), Pat64 = sum(Pat64)) %>%
+  select(Code = CCG_Code,
+         Area = CCG_Name,
+         Dem64,
+         Pat64)
+ 
+ 
+STP_df <- df %>% # Aggregate STPs
+  group_by(STP_Code, STP_Name) %>%
+  summarise(Dem64 = sum(Dem64), Pat64 = sum(Pat64))%>%
+  select(Code = STP_Code,
+         Area = STP_Name,
+         Dem64,
+         Pat64)
+ 
+ 
+England_df <- df %>% # Aggregate England value
+  group_by(England_Code, England_Name) %>%
+  summarise(Dem64 = sum(Dem64), Pat64 = sum(Pat64))%>%
+  select(Code = England_Code,
+         Area = England_Name,
+         Dem64,
+         Pat64)
+ 
+ 
+df <- CCG_df %>% # Bind them all together
+  bind_rows(STP_df) %>%
+  bind_rows(England_df) %>%
+  select(Code,
+         Area,
+         Dem64,
+         Pat64)
+ 
+# 9. Numerator/Denominator and Value ------------------------------------------
+ 
+df <- df %>%
+  rename(Num = Dem64) %>%
+  ungroup(df) %>%
+  rename(Denom = Pat64) %>% # changed this from mutate to rename
+  mutate(Val  = Num/Denom) %>%
+  mutate(Val = Val * 10000) %>%
+  select(Code, Area, Num, Denom, Val)
+ 
+ 
+# 10. Confidence Intervals ----------------------------------------------------
+ 
+df <- df %>%
+  mutate(Lower1 = wilson_lower(Num, Denom)) %>%
+  mutate(Lower = Lower1 * 10000) %>%
+  mutate(Lower1 = NULL)%>%
+  mutate(Upper1 = wilson_upper(Num, Denom)) %>%
+  mutate(Upper = Upper1 * 10000) %>%
+  mutate(Upper1 = NULL)
+ 
+# 11. PHOLIO -------------------------------------------------------------------
+ 
+df <- df %>% # Change the values as necessary
+  transmute(IndicatorID = 93026,
+            Year = 2018,
+            YearRange = 1,
+            Quarter = -1,
+            Month = -1,
+            AgeID = 279,
+            SexID = 4,
+            AreaCode = Code,
+            Count = Num,
+            Value = Val,
+            LowerCI95 = Lower,
+            UpperCI95 = Upper,
+            LowerCI99_8 = -1,
+            UpperCI99_8 = -1,
+            Denominator = Denom,
+            Denominator_2 = -1,
+            ValueNoteId = 0,
+            CategoryTypeId = -1,
+            CategoryId = -1)
+ 
+write.xlsx(df,file = "93026_CCG.xlsx", sheetName = "PHOLIO")
