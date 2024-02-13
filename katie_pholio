@@ -1,0 +1,141 @@
+
+# Install fingertipsR--------------------------------------------------------------------------------------------------  
+
+ install.packages('fingertipsR')    
+
+ Library(fingertipsR)    
+
+ 
+# Create a vector including names of all MH profiles ----------------------------------------------------- 
+
+ 
+
+prof_names <- c("Mental Health and Wellbeing JSNA", 
+
+                "Perinatal Mental Health", 
+
+                "Children and Young People's Mental Health and Wellbeing", 
+
+                "Common Mental Health Disorders", 
+
+                "Co-occurring substance misuse and mental health issues", 
+
+                "Crisis Care Profile", 
+
+                "Severe Mental Illness", 
+
+                "Suicide Prevention Profile") 
+
+ 
+
+# Return all profiles and there topic names ---------------------------------------------------------------- 
+
+profs <- profiles() 
+
+
+# Filters profiles for all MH profiles -------------------------------------------------------------------------- 
+
+profs_2 <- profs %>% 
+
+  filter(ProfileName %in% prof_names) 
+
+ 
+
+# Return indicators for the profiles -------------------------------------------------------------------------- 
+
+ 
+
+inds <- indicators(ProfileID = unique(profs_2$ProfileID)) 
+
+ 
+
+# Return the indicator data for each indicator ----------------------------------------------------------- 
+
+ 
+
+df <- fingertips_data(inds$IndicatorID, AreaTypeID = "All") 
+
+ 
+
+# The following script allows you to identify which domains and Mental Health profiles the indicators are present in  
+
+
+inds_2 <- inds %>% 
+
+  mutate(ProfileDomain = paste(ProfileName, DomainName, sep = "."), 
+
+         val = 1) %>% 
+
+  spread(ProfileName, val) %>% 
+
+  mutate(val = 1) %>% 
+
+  spread(ProfileDomain, val) %>% 
+
+  select(-DomainID, 
+
+         -DomainName, 
+
+         -ProfileID) %>% 
+
+  group_by(IndicatorID, IndicatorName) %>% 
+
+  summarise(across(1:46,  ~ sum(.x, na.rm = TRUE))) 
+
+ 
+
+# The following bit of script in conjunction with the above allows you to identify which all profiles the indicators are present in  
+
+ 
+inds_3 <- indicators(ProfileID = unique(profs$ProfileID)) %>% 
+
+  filter(IndicatorID %in% inds_2$IndicatorID) %>% 
+
+  select(-DomainName, 
+
+         -DomainID, 
+
+         -ProfileID) %>% 
+
+  mutate(val = 1) %>% 
+
+  distinct() %>% 
+
+  spread(ProfileName, val) %>% 
+
+  group_by(IndicatorID, IndicatorName) %>% 
+
+  summarise(across(1:36,  ~ sum(.x, na.rm = TRUE))) 
+
+ 
+
+# This bit of script in conjunction with above allows you to identify the overall completeness of an indicator at each geography level. 
+# With completeness defined as having a null value or value note saying 'Value suppressed for disclosure control due to small count' 
+
+
+df_2 <- df %>% 
+
+  group_by(IndicatorID, 
+
+           Timeperiod, 
+
+           AreaType, 
+
+           Sex, 
+
+           Age, 
+
+           Category) %>% 
+
+  mutate(is_nil = case_when(is.na(Value) ~ 0, 
+
+                            Valuenote == "Value suppressed for disclosure control due to small count" ~ 0, 
+
+                            T ~ 1)) %>% 
+
+  summarise(is_na_sum = sum(is_nil), 
+
+            total_rows = n()) %>% 
+
+  mutate(completeness = (is_na_sum/total_rows)* 100) 
+
